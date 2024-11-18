@@ -33,10 +33,12 @@ RUN chmod +x /start.sh
 
 # Run the application as a non-root user for security
 RUN useradd -m myuser
-USER myuser
 
-# Set correct permissions for app directory
+# Set correct permissions for app directory after copying files
 RUN chown -R myuser:myuser /myapp
+
+# Switch to the non-root user
+USER myuser
 
 # Expose port for the application
 EXPOSE 8000
