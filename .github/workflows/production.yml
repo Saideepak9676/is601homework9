@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.10.12]
+        python-version: [3.10.12] # Define Python versions here
     steps:
       - uses: actions/checkout@v4
       
@@ -26,7 +26,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('/requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
       
@@ -42,8 +42,6 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     environment: production
-    env:
-      TRIVY_CACHE_DIR: ~/.cache/trivy
     steps:
       - uses: actions/checkout@v4
       
@@ -60,8 +58,8 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           push: true
-          tags: saideepak9676/is601homework9:latest
-          platforms: linux/amd64,linux/arm64
+          tags: saideepak9676/is601homework9:latest # Correct tag for DockerHub image
+          platforms: linux/amd64,linux/arm64 # Multi-platform support
           cache-from: type=registry,ref=saideepak9676/is601homework9:cache
           cache-to: type=inline,mode=max
           
@@ -77,9 +75,26 @@ jobs:
         run: |
           curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
 
-      - name: Download Trivy DB
-        run: trivy image --download-db-only
+      # Retry logic for downloading the Trivy DB
+      - name: Retry Download Trivy DB
+        run: |
+          MAX_RETRIES=5
+          RETRY_INTERVAL=5
+          RETRIES=0
+          while [ $RETRIES -lt $MAX_RETRIES ]; do
+            mkdir -p ~/.cache/trivy
+            trivy image --download-db-only
+            if [ $? -eq 0 ]; then
+              echo "Trivy DB download succeeded"
+              break
+            else
+              RETRIES=$((RETRIES + 1))
+              echo "Trivy DB download failed. Retrying in $RETRY_INTERVAL seconds..."
+              sleep $RETRY_INTERVAL
+            fi
+          done
 
-      - name: Scan the Docker image for vulnerabilities
+      # Scan the Docker image after DB is downloaded
+      - name: Scan the Docker image with Trivy
         run: |
           trivy image saideepak9676/is601homework9:latest --format table --exit-code 1 --ignore-unfixed --severity CRITICAL,HIGH
